@@ -1,0 +1,48 @@
+# CMake build outputs
+/build/
+/out/
+/cmake-build-*/
+/CMakeFiles/
+/CMakeCache.txt
+/cmake_install.cmake
+/CTestTestfile.cmake
+/Testing/
+/DartConfiguration.tcl
+/compile_commands.json
+
+# Compiled objects and binaries
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+*.out
+*.app/
+*.dSYM/
+
+# Test and coverage artifacts
+*.gcda
+*.gcno
+*.gcov
+coverage/
+.coverage
+
+# Local caches
+.cache/
+.clangd/
+*.pch
+
+# IDE and editor state
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS metadata
+.DS_Store
+Thumbs.db
