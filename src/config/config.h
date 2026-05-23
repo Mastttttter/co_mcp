@@ -1,4 +1,5 @@
 #pragma once
+#include <spdlog/spdlog.h>
 #include <nlohmann/json.hpp>
 #include "json_helper.hpp"
 
@@ -19,7 +20,7 @@ class Config {
     return cfg_.logging.log_file_path;
   }
 
-  std::string GetLogLevel() const {
+  spdlog::level::level_enum GetLogLevel() const {
     return cfg_.logging.log_level;
   }
 
@@ -43,7 +44,8 @@ class Config {
   struct[[= json_helper::json_meta::serializable]] Logging_ {
     [[= json_helper::json_meta::default_string(
         "logs/server.log")]] std::string log_file_path;
-    [[= json_helper::json_meta::default_string("info")]] std::string log_level;
+    [[= json_helper::json_meta::default_value{
+        spdlog::level::info}]] spdlog::level::level_enum log_level;
     [[= json_helper::json_meta::default_value{10 * 1024 *
                                               1024uz}]] size_t log_file_size;
     [[= json_helper::json_meta::default_value{5}]] int log_file_count;

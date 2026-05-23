@@ -3,9 +3,10 @@
 
 TEST(ConfigTest, LoadFromFile) {
   auto &config = mcp::Config::GetInstance();
-  EXPECT_EQ(config.LoadFromFile("resources/in"), true);
+  EXPECT_EQ(config.LoadFromFile("resources/config.json"), true);
   EXPECT_EQ(config.GetServerPort(), 8080);
   EXPECT_EQ(config.GetLogFilePath(), "logs/server.log");
+  EXPECT_EQ(config.GetLogLevel(), spdlog::level::warn);
 }
 
 int main(int argc, char **argv) {
