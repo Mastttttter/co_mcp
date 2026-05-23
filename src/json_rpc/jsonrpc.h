@@ -44,4 +44,20 @@ class JsonRpcDispatcher {
   private:
   std::unordered_map<std::string, Handler> handlers_;
 };
+
+class StdioJsonRpcServer {
+  public:
+  explicit StdioJsonRpcServer(JsonRpcDispatcher dispatcher) noexcept;
+  StdioJsonRpcServer(JsonRpcDispatcher dispatcher, std::istream &in,
+                     std::ostream &out) noexcept;
+  void Run() noexcept;
+
+  private:
+  JsonRpcDispatcher dispatcher_;
+  std::istream &in_;
+  std::ostream &out_;
+  bool ReadMessage(std::string &out_body) noexcept;
+  void WriteMessage(json const &msg) noexcept;
+  JsonRpcResponse HandleRequest(JsonRpcRequest const &req) const noexcept;
+};
 }  // namespace mcp
