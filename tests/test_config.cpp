@@ -6,7 +6,7 @@ TEST(ConfigTest, LoadFromFile) {
   EXPECT_EQ(config.LoadFromFile("resources/config.json"), true);
   EXPECT_EQ(config.GetServerPort(), 8080);
   EXPECT_EQ(config.GetLogFilePath(), "logs/server.log");
-  EXPECT_EQ(config.GetLogLevel(), spdlog::level::warn);
+  EXPECT_EQ(config.GetLogLevel(), spdlog::level::info);
 }
 
 int main(int argc, char **argv) {

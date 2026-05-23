@@ -9,7 +9,7 @@ find_package(nlohmann_json REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(GTest REQUIRED)
 
+enable_testing()
+
 add_subdirectory(src)
 add_subdirectory(tests)
-
-enable_testing()

@@ -42,6 +42,8 @@ coverage/
 *.swp
 *.swo
 *~
+CLAUDE.md
+.claude
 
 # OS metadata
 .DS_Store
