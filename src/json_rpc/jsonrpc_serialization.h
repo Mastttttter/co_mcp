@@ -1,6 +1,6 @@
 #pragma once
 
-#include "json_rpc.h"
+#include "jsonrpc.h"
 
 namespace mcp {
 

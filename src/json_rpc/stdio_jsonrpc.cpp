@@ -1,4 +1,4 @@
-#include "json_rpc.h"
+#include "jsonrpc.h"
 
 namespace mcp {
 void JsonRpcDispatcher::RegisterHandler(std::string const &method,
