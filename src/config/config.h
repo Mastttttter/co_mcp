@@ -45,13 +45,13 @@ class Config {
   }
 
   private:
-  struct[[= json_helper::json_meta::serializable]] Server_ {
+  struct Server_ {
     [[= json_helper::json_meta::default_value<int>{8080}]] int port;
     [[= json_helper::json_meta::default_value<int>{1}]] int thread_num;
     [[= json_helper::json_meta::default_string("::")]] std::string host;
   };
 
-  struct[[= json_helper::json_meta::serializable]] Logging_ {
+  struct Logging_ {
     [[= json_helper::json_meta::default_string(
         "logs/server.log")]] std::string log_file_path;
     [[= json_helper::json_meta::default_value{
@@ -62,7 +62,7 @@ class Config {
     [[= json_helper::json_meta::default_value{false}]] bool log_console_output;
   };
 
-  struct[[= json_helper::json_meta::serializable]] Config_ {
+  struct Config_ {
     Server_ server;
     Logging_ logging;
   };

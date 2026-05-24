@@ -1,6 +1,6 @@
 #include <iostream>
+#include <json_helper.hpp>
 #include "jsonrpc.h"
-#include "jsonrpc_serialization.h"
 #include "logger.h"
 
 namespace mcp {
@@ -123,13 +123,13 @@ void StdioJsonRpcServer::Run() noexcept {
     try {
       json request_json = json::parse(message_body);
       JsonRpcRequest request;
-      from_json(request_json, request);
+      json_helper::from_json_reflect_into(request_json, request);
       MCP_LOG_DEBUG(
           "Received request: method={},id={}", request.method,
           request.id.has_value() ? request.id.value().dump() : "null");
       JsonRpcResponse response = HandleRequest(request);
       if (request.id.has_value()) {
-        WriteMessage(response);
+        WriteMessage(json_helper::reflect_to_json(response));
       }
     } catch (std::exception const &e) {
       MCP_LOG_ERROR("Error processing request: {}", e.what());
