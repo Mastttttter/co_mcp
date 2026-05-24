@@ -30,7 +30,7 @@ class Logger {
   public:
   static Logger &GetInstance() noexcept;
   void Init(std::string_view logger_name = "mcp",
-            std::string_view log_file_path = "",
+            std::string_view log_file_path = "logs/server.log",
             size_t max_file_size = 10 * 1024 * 1024, size_t max_files = 5,
             bool console_output = true);
   void SetLevel(spdlog::level::level_enum level) noexcept;

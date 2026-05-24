@@ -19,3 +19,12 @@ spdlog::spdlog
 )
 
 target_compile_options(mcp_lib PUBLIC -freflection)
+
+add_executable(mcp_server mcp_demo_server_main.cpp)
+target_link_libraries(mcp_server mcp_lib)
+add_custom_command(
+  TARGET mcp_server POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+          ${CMAKE_SOURCE_DIR}/resources
+          $<TARGET_FILE_DIR:mcp_server>/resources
+)

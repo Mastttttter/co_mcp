@@ -65,6 +65,7 @@ HttpJsonRpcServer::HttpJsonRpcServer(JsonRpcDispatcher dispatcher)
   port_ = Config::GetInstance().GetServerPort();
   thread_num_ = Config::GetInstance().GetServerThreadNum();
   impl_ = std::make_unique<Impl>(thread_num_, port_, host_);
+  Init();
 }
 
 HttpJsonRpcServer::HttpJsonRpcServer(JsonRpcDispatcher dispatcher,
@@ -74,6 +75,7 @@ HttpJsonRpcServer::HttpJsonRpcServer(JsonRpcDispatcher dispatcher,
       host_(host),
       thread_num_(thread_num) {
   impl_ = std::make_unique<Impl>(thread_num_, port_, host_);
+  Init();
 }
 
 HttpJsonRpcServer::~HttpJsonRpcServer() {
@@ -86,7 +88,6 @@ void HttpJsonRpcServer::Run() {
   }
   running_.store(true);
   impl_->server.async_start();
-  Init();
 }
 
 void HttpJsonRpcServer::Stop() {
@@ -95,7 +96,6 @@ void HttpJsonRpcServer::Stop() {
   }
   running_.store(false);
   impl_->server.stop();
-  Init();
 }
 
 void HttpJsonRpcServer::Init() {
