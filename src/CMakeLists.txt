@@ -3,6 +3,7 @@ config/config.cpp
 logger/logger.cpp
 json_rpc/stdio_jsonrpc.cpp
 json_rpc/jsonrpc_serialization.cpp
+json_rpc/http_jsonrpc.cpp
 )
 
 target_include_directories(mcp_lib PUBLIC

@@ -16,6 +16,14 @@ class Config {
     return cfg_.server.port;
   }
 
+  int GetServerThreadNum() const {
+    return cfg_.server.thread_num;
+  }
+
+  std::string GetServerHost() const {
+    return cfg_.server.host;
+  }
+
   std::string GetLogFilePath() const {
     return cfg_.logging.log_file_path;
   }
@@ -39,6 +47,8 @@ class Config {
   private:
   struct[[= json_helper::json_meta::serializable]] Server_ {
     [[= json_helper::json_meta::default_value<int>{8080}]] int port;
+    [[= json_helper::json_meta::default_value<int>{1}]] int thread_num;
+    [[= json_helper::json_meta::default_string("::")]] std::string host;
   };
 
   struct[[= json_helper::json_meta::serializable]] Logging_ {
