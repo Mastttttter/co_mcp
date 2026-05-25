@@ -5,11 +5,14 @@
 #include "cinatra/coro_http_response.hpp"
 #include "cinatra/response_cv.hpp"
 #include "config.h"
+#include "json_helper.hpp"
 #include "logger.h"
+#include <optional>
+#include <utility>
 
 namespace mcp {
 
-static std::string jsonrpc_error(int code, std::string_view message,
+static json jsonrpc_error_object(int code, std::string_view message,
                                  json id = nullptr) {
   return json{
       {"jsonrpc", "2.0"},
@@ -19,8 +22,29 @@ static std::string jsonrpc_error(int code, std::string_view message,
            {"message", std::string(message)},
        }},
       {"id", std::move(id)},
+  };
+}
+
+static std::string jsonrpc_error(int code, std::string_view message,
+                                 json id = nullptr) {
+  return jsonrpc_error_object(code, message, std::move(id)).dump();
+}
+
+static JsonRpcRequest parse_jsonrpc_request(json const &request_json) {
+  if (!request_json.is_object()) {
+    throw std::runtime_error("Invalid request");
   }
-      .dump();
+
+  JsonRpcRequest request;
+  request.jsonrpc = request_json.value("jsonrpc", "2.0");
+  request.method = request_json.at("method").get<std::string>();
+  if (request_json.contains("id")) {
+    request.id = request_json["id"];
+  }
+  if (request_json.contains("params")) {
+    request.params = request_json["params"];
+  }
+  return request;
 }
 
 class HttpJsonRpcServer::Impl {
@@ -73,6 +97,7 @@ HttpJsonRpcServer::HttpJsonRpcServer(JsonRpcDispatcher dispatcher,
                                      int thread_num)
     : dispatcher_(dispatcher),
       host_(host),
+      port_(port),
       thread_num_(thread_num) {
   impl_ = std::make_unique<Impl>(thread_num_, port_, host_);
   Init();
@@ -100,7 +125,7 @@ void HttpJsonRpcServer::Stop() {
 
 void HttpJsonRpcServer::Init() {
   using namespace cinatra;
-  impl_->server.set_http_handler<GET>(
+  impl_->server.set_http_handler<POST>(
       "/jsonrpc",
       [this](coro_http_request &req,
              coro_http_response &resp) -> async_simple::coro::Lazy<void> {
@@ -111,7 +136,11 @@ void HttpJsonRpcServer::Init() {
         try {
           std::string response =
               co_await HandleRequest(std::string{req.get_body()});
-          resp.set_status_and_content(status_type::ok, response);
+          if (response.empty()) {
+            resp.set_status(status_type::no_content);
+          } else {
+            resp.set_status_and_content(status_type::ok, response);
+          }
         } catch (std::exception const &e) {
           MCP_LOG_ERROR("Error handing request:{}", e.what());
           resp.set_status_and_content(status_type::ok,
@@ -189,7 +218,82 @@ void HttpJsonRpcServer::RegisterSseEndpoint(std::string const &path,
 
 async_simple::coro::Lazy<std::string> HttpJsonRpcServer::HandleRequest(
     std::string const &request_body) {
-  std::string s = "adf";
-  co_return s;
+  MCP_LOG_DEBUG("Request body: {}", request_body);
+
+  auto handle_single_request =
+      [this](JsonRpcRequest const &request)
+          -> async_simple::coro::Lazy<std::optional<JsonRpcResponse>> {
+    bool const has_id = request.id.has_value();
+    json id = has_id ? request.id.value() : json(nullptr);
+
+    if (!dispatcher_.HasHandler(request.method)) {
+      if (!has_id) {
+        co_return std::nullopt;
+      }
+      JsonRpcResponse response;
+      response.id = std::move(id);
+      response.error = JsonRpcError{.code = jsonrpc_errc::MethodNotFound,
+                                    .message = "Method not found: " + request.method};
+      co_return std::optional<JsonRpcResponse>{std::move(response)};
+    }
+
+    try {
+      auto params = request.params.value_or(json::object());
+      auto result = co_await dispatcher_.Call(request.method, params);
+      if (!has_id) {
+        co_return std::nullopt;
+      }
+
+      JsonRpcResponse response;
+      response.id = std::move(id);
+      response.result = std::move(result);
+      co_return std::optional<JsonRpcResponse>{std::move(response)};
+    } catch (std::exception const &e) {
+      if (!has_id) {
+        co_return std::nullopt;
+      }
+      JsonRpcResponse response;
+      response.id = std::move(id);
+      response.error = JsonRpcError{.code = jsonrpc_errc::InternalError,
+                                    .message = e.what()};
+      co_return std::optional<JsonRpcResponse>{std::move(response)};
+    }
+  };
+
+  try {
+    auto request_json = json::parse(request_body);
+    if (request_json.is_array()) {
+      json batch_response = json::array();
+      for (auto const &single_request_json: request_json) {
+        try {
+          auto request = parse_jsonrpc_request(single_request_json);
+          auto response = co_await handle_single_request(request);
+          if (response.has_value()) {
+            batch_response.push_back(json_helper::reflect_to_json(response.value()));
+          }
+        } catch (std::exception const &e) {
+          MCP_LOG_WARN("Error in batch request: {}", e.what());
+          batch_response.push_back(jsonrpc_error_object(jsonrpc_errc::InvalidRequest,
+                                                       "Invalid request"));
+        }
+      }
+      if (batch_response.empty()) {
+        co_return std::string{};
+      }
+      co_return batch_response.dump();
+    }
+
+    auto request = parse_jsonrpc_request(request_json);
+    auto response = co_await handle_single_request(request);
+    if (!response.has_value()) {
+      co_return std::string{};
+    }
+    co_return json_helper::reflect_to_json(response.value()).dump();
+  } catch (json::parse_error const &) {
+    co_return jsonrpc_error(jsonrpc_errc::ParseError, "Parse error");
+  } catch (std::exception const &e) {
+    MCP_LOG_WARN("Invalid request: {}", e.what());
+    co_return jsonrpc_error(jsonrpc_errc::InvalidRequest, "Invalid request");
+  }
 }
 }  // namespace mcp

@@ -2,10 +2,22 @@
 #include <format>
 #include <mutex>
 #include <shared_mutex>
+#include <utility>
 #include "logger.h"
 #include "types.h"
 
 namespace mcp {
+
+McpServer::McpServer() : McpServer("co_mcp", "1.0.0") {}
+
+McpServer::McpServer(std::string name, std::string version)
+    : server_info_{.name = std::move(name), .version = std::move(version)} {}
+
+InitializeResult McpServer::GetInitializeResult() const {
+  return InitializeResult{.protocolVersion = std::string(LATEST_PROTOCOL_VERSION),
+                          .capabilities = json{{"tools", json::object()}},
+                          .serverInfo = server_info_};
+}
 
 void McpServer::RegisterTool(Tool const &tool, ToolHandler handler) {
   std::lock_guard lock(tools_mutex_);
@@ -55,6 +67,7 @@ async_simple::coro::Lazy<ToolResult> McpServer::CallTool(
 }
 
 bool McpServer::HasTool(std::string const &name) const {
+  std::shared_lock lock(tools_mutex_);
   return tools_.contains(name);
 }
 

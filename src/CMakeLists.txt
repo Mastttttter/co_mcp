@@ -5,11 +5,11 @@ json_rpc/stdio_jsonrpc.cpp
 json_rpc/http_jsonrpc.cpp
 mcp/types.cpp
 mcp/mcp_server.cpp
-mcp_demo_server_main.cpp
 )
 
 add_subdirectory(utilities)
 target_include_directories(mcp_lib PUBLIC
+${CMAKE_CURRENT_SOURCE_DIR}
 ${CMAKE_CURRENT_SOURCE_DIR}/config
 ${CMAKE_CURRENT_SOURCE_DIR}/logger
 )

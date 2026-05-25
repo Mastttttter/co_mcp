@@ -19,6 +19,15 @@ target_link_libraries(test_logger
 )
 gtest_discover_tests(test_logger)
 
+add_executable(test_mcp_server
+  test_mcp_server.cpp
+)
+target_link_libraries(test_mcp_server
+  mcp_lib
+  GTest::gtest
+)
+gtest_discover_tests(test_mcp_server)
+
 
 add_custom_command(
   TARGET test_config POST_BUILD

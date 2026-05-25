@@ -1,9 +1,25 @@
 #pragma once
 #include <nlohmann/json.hpp>
+#include <optional>
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace mcp {
 using namespace nlohmann;
+
+inline constexpr std::string_view LATEST_PROTOCOL_VERSION = "2025-06-18";
+
+struct ServerInfo {
+  std::string name;
+  std::string version;
+};
+
+struct InitializeResult {
+  std::string protocolVersion = std::string(LATEST_PROTOCOL_VERSION);
+  json capabilities = json{{"tools", json::object()}};
+  ServerInfo serverInfo;
+};
 
 struct ToolInputSchema {
   std::string type = "object";

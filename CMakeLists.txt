@@ -12,5 +12,6 @@ find_package(GTest REQUIRED)
 enable_testing()
 
 add_subdirectory(src)
+add_subdirectory(examples)
 add_subdirectory(tests)
 add_subdirectory(lib)
