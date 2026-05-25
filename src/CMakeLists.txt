@@ -3,6 +3,9 @@ config/config.cpp
 logger/logger.cpp
 json_rpc/stdio_jsonrpc.cpp
 json_rpc/http_jsonrpc.cpp
+mcp/types.cpp
+mcp/mcp_server.cpp
+mcp_demo_server_main.cpp
 )
 
 add_subdirectory(utilities)

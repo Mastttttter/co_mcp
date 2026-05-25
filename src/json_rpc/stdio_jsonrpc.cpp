@@ -1,5 +1,7 @@
 #include <iostream>
 #include <json_helper.hpp>
+#include "async_simple/coro/Lazy.h"
+#include "async_simple/coro/SyncAwait.h"
 #include "jsonrpc.h"
 #include "logger.h"
 
@@ -13,10 +15,10 @@ bool JsonRpcDispatcher::HasHandler(std::string const &method) const noexcept {
   return handlers_.contains(method);
 }
 
-json JsonRpcDispatcher::Call(std::string const &method,
-                             json const &params) const {
+async_simple::coro::Lazy<json> JsonRpcDispatcher::Call(
+    std::string const &method, json const &params) const {
   if (auto it = handlers_.find(method); it != handlers_.end()) {
-    return it->second(params);
+    co_return co_await it->second(params);
   } else {
     throw std::runtime_error("Methos not found");
   }
@@ -106,7 +108,7 @@ void StdioJsonRpcServer::WriteMessage(json const &msg) noexcept {
   MCP_LOG_DEBUG("Sent response: {} bytes", content_length);
 }
 
-void StdioJsonRpcServer::Run() noexcept {
+async_simple::coro::Lazy<void> StdioJsonRpcServer::Run() noexcept {
   MCP_LOG_INFO("StdioJsonRpcServer started");
   while (std::cin.good()) {
     std::string message_body;
@@ -127,7 +129,7 @@ void StdioJsonRpcServer::Run() noexcept {
       MCP_LOG_DEBUG(
           "Received request: method={},id={}", request.method,
           request.id.has_value() ? request.id.value().dump() : "null");
-      JsonRpcResponse response = HandleRequest(request);
+      JsonRpcResponse response = co_await HandleRequest(request);
       if (request.id.has_value()) {
         WriteMessage(json_helper::reflect_to_json(response));
       }
@@ -138,7 +140,7 @@ void StdioJsonRpcServer::Run() noexcept {
   MCP_LOG_INFO("StdioJsonRpcServer exiting");
 }
 
-JsonRpcResponse StdioJsonRpcServer::HandleRequest(
+async_simple::coro::Lazy<JsonRpcResponse> StdioJsonRpcServer::HandleRequest(
     JsonRpcRequest const &req) const noexcept {
   JsonRpcResponse resp;
   resp.id = req.id.has_value() ? req.id.value() : json(nullptr);
@@ -146,15 +148,15 @@ JsonRpcResponse StdioJsonRpcServer::HandleRequest(
     if (!dispatcher_.HasHandler(req.method)) {
       resp.error = JsonRpcError{.code = jsonrpc_errc::MethodNotFound,
                                 .message = "Method not found: " + req.method};
-      return resp;
+      co_return resp;
     }
     json params = req.params.has_value() ? req.params.value() : json::object();
-    json result = dispatcher_.Call(req.method, params);
+    json result = co_await dispatcher_.Call(req.method, params);
     resp.result = result;
   } catch (std::exception &e) {
     resp.error =
         JsonRpcError{.code = jsonrpc_errc::InternalError, .message = e.what()};
   }
-  return resp;
+  co_return resp;
 }
 };  // namespace mcp

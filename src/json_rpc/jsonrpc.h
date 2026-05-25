@@ -1,4 +1,5 @@
 #pragma once
+#include <async_simple/coro/Lazy.h>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
@@ -36,10 +37,11 @@ constexpr int InternalError = -32603;
 
 class JsonRpcDispatcher {
   public:
-  using Handler = std::function<json(json const &)>;
+  using Handler = std::function<async_simple::coro::Lazy<json>(json const &)>;
   void RegisterHandler(std::string const &method, Handler handler) noexcept;
   bool HasHandler(std::string const &) const noexcept;
-  json Call(std::string const &method, json const &params) const;
+  async_simple::coro::Lazy<json> Call(std::string const &method,
+                                      json const &params) const;
 
   private:
   std::unordered_map<std::string, Handler> handlers_;
@@ -50,7 +52,7 @@ class StdioJsonRpcServer {
   explicit StdioJsonRpcServer(JsonRpcDispatcher dispatcher) noexcept;
   StdioJsonRpcServer(JsonRpcDispatcher dispatcher, std::istream &in,
                      std::ostream &out) noexcept;
-  void Run() noexcept;
+  async_simple::coro::Lazy<void> Run() noexcept;
 
   private:
   JsonRpcDispatcher dispatcher_;
@@ -58,6 +60,7 @@ class StdioJsonRpcServer {
   std::ostream &out_;
   bool ReadMessage(std::string &out_body) noexcept;
   void WriteMessage(json const &msg) noexcept;
-  JsonRpcResponse HandleRequest(JsonRpcRequest const &req) const noexcept;
+  async_simple::coro::Lazy<JsonRpcResponse> HandleRequest(
+      JsonRpcRequest const &req) const noexcept;
 };
 }  // namespace mcp

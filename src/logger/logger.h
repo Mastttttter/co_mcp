@@ -23,6 +23,12 @@
     if (logger) \
       logger->info("[{}:{}]" fmt, __FILE__, __LINE__, ##__VA_ARGS__); \
   } while (0)
+#define MCP_LOG_WARN(fmt, ...) \
+  do { \
+    auto logger = ::mcp::Logger::GetInstance().GetLogger(); \
+    if (logger) \
+      logger->warn("[{}:{}]" fmt, __FILE__, __LINE__, ##__VA_ARGS__); \
+  } while (0)
 
 namespace mcp {
 
