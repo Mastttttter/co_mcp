@@ -1,6 +1,7 @@
 #include "mcp_server.h"
 #include <format>
 #include <mutex>
+#include <ranges>
 #include <shared_mutex>
 #include <utility>
 #include "logger.h"
@@ -16,7 +17,6 @@ McpServer::McpServer(std::string name, std::string version)
 InitializeResult McpServer::GetInitializeResult() const {
   return InitializeResult{
       .protocolVersion = std::string(LATEST_PROTOCOL_VERSION),
-      .capabilities = json{{"tools", json::object()}},
       .serverInfo = server_info_};
 }
 
@@ -35,7 +35,7 @@ void McpServer::RegisterTool(Tool const &tool, ToolHandler handler) {
 }
 
 std::vector<Tool> McpServer::ListTool() const {
-  std::lock_guard lock(tools_mutex_);
+  std::shared_lock lock(tools_mutex_);
   return tools_ | std::views::transform([](auto const &in) -> auto const & {
            return in.second;
          }) |
@@ -83,7 +83,7 @@ void McpServer::RegisterResource(Resource const &resource,
 }
 
 std::vector<Resource> McpServer::ListResources() const {
-  std::lock_guard lock(resource_mutex_);
+  std::shared_lock lock(resource_mutex_);
   return resources_ | std::views::transform([](auto const &in) -> auto const & {
            return in.second;
          }) |
@@ -108,6 +108,43 @@ async_simple::coro::Lazy<ResourceContent> McpServer::ReadResource(
 bool McpServer::HasResource(std::string const &uri) const {
   std::shared_lock lock(resource_mutex_);
   return resources_.contains(uri);
+}
+
+void McpServer::RegisterPrompt(Prompt const &prompt,
+                               PromptGenerator generator) {
+  std::lock_guard lock(prompt_mutex_);
+  prompts_[prompt.name] = prompt;
+  prompt_generators_[prompt.name] = std::move(generator);
+  MCP_LOG_INFO("Prompt registered: {}", prompt.name);
+}
+
+std::vector<Prompt> McpServer::ListPrompts() const {
+  std::shared_lock lock(prompt_mutex_);
+  return prompts_ | std::views::transform([](auto const &in) -> auto const & {
+           return in.second;
+         }) |
+         std::ranges::to<std::vector<Prompt>>();
+}
+
+async_simple::coro::Lazy<std::vector<PromptMessage>> McpServer::GetPrompt(
+    std::string const &name, json const &arguments) {
+  std::shared_lock lock(prompt_mutex_);
+  auto gen_it = prompt_generators_.find(name);
+  if (gen_it == prompt_generators_.end()) {
+    throw std::runtime_error(std::format("Prompt not found: {}", name));
+  }
+  try {
+    co_return co_await gen_it->second(arguments);
+  } catch (std::exception const &e) {
+    auto s = std::format("failed to generate prompt '{}':{}", name, e.what());
+    MCP_LOG_ERROR("{}", s);
+    throw std::runtime_error(s);
+  }
+}
+
+bool McpServer::HasPrompt(std::string const &name) const {
+  std::shared_lock lock(prompt_mutex_);
+  return prompts_.contains(name);
 }
 
 void McpServer::SetSseCallback(SseEventCallback callback) {

@@ -34,11 +34,9 @@ TEST(McpServerTest, ReturnsInitializeMetadata) {
 
   auto result = server.GetInitializeResult();
 
-  EXPECT_EQ(result.protocolVersion,
-            std::string(mcp::LATEST_PROTOCOL_VERSION));
+  EXPECT_EQ(result.protocolVersion, std::string(mcp::LATEST_PROTOCOL_VERSION));
   EXPECT_EQ(result.serverInfo.name, "test-server");
   EXPECT_EQ(result.serverInfo.version, "0.2.0");
-  EXPECT_TRUE(result.capabilities.contains("tools"));
 }
 
 TEST(McpServerTest, RegistersAndListsTools) {
@@ -46,14 +44,16 @@ TEST(McpServerTest, RegistersAndListsTools) {
   auto echo = MakeTool("echo", "Echo text");
   auto add = MakeTool("add", "Add numbers");
 
-  server.RegisterTool(echo, [](mcp::json const &)
-                                -> async_simple::coro::Lazy<mcp::ToolResult> {
-    co_return mcp::ToolResult{.content = {}, .type = mcp::ToolResultType::result};
-  });
-  server.RegisterTool(add, [](mcp::json const &)
-                               -> async_simple::coro::Lazy<mcp::ToolResult> {
-    co_return mcp::ToolResult{.content = {}, .type = mcp::ToolResultType::result};
-  });
+  server.RegisterTool(
+      echo, [](mcp::json const &) -> async_simple::coro::Lazy<mcp::ToolResult> {
+        co_return mcp::ToolResult{.content = {},
+                                  .type = mcp::ToolResultType::result};
+      });
+  server.RegisterTool(
+      add, [](mcp::json const &) -> async_simple::coro::Lazy<mcp::ToolResult> {
+        co_return mcp::ToolResult{.content = {},
+                                  .type = mcp::ToolResultType::result};
+      });
 
   EXPECT_TRUE(server.HasTool("echo"));
   EXPECT_TRUE(server.HasTool("add"));
@@ -66,7 +66,8 @@ TEST(McpServerTest, CallsRegisteredTool) {
   mcp::McpServer server;
   server.RegisterTool(
       MakeTool("echo", "Echo text"),
-      [](mcp::json const &arguments) -> async_simple::coro::Lazy<mcp::ToolResult> {
+      [](mcp::json const &arguments)
+          -> async_simple::coro::Lazy<mcp::ToolResult> {
         co_return mcp::ToolResult{
             .content{{.type = "text",
                       .text = arguments.at("message").get<std::string>()}},

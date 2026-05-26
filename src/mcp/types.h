@@ -17,7 +17,6 @@ struct ServerInfo {
 
 struct InitializeResult {
   std::string protocolVersion = std::string(LATEST_PROTOCOL_VERSION);
-  json capabilities = json{{"tools", json::object()}};
   ServerInfo serverInfo;
 };
 
@@ -63,6 +62,28 @@ struct ResourceContent {
   std::optional<std::string> mimeType;
   std::string text;
   std::optional<std::string> blob;
+};
+
+struct PromptArgument {
+  std::string name;
+  std::optional<std::string> description;
+  bool required = false;
+};
+
+struct Prompt {
+  std::string name;
+  std::optional<std::string> description;
+  std::vector<PromptArgument> arguments;
+};
+
+enum class Role {
+  User,
+  Assistant,
+};
+
+struct PromptMessage {
+  Role role;
+  json content;
 };
 
 }  // namespace mcp

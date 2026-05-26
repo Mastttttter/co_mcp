@@ -20,6 +20,9 @@ class McpServer {
   using ResourceProvider =
       std::function<async_simple::coro::Lazy<ResourceContent>(
           std::string const &uri)>;
+  using PromptGenerator =
+      std::function<async_simple::coro::Lazy<std::vector<PromptMessage>>(
+          json const &arguments)>;
   using SseEventCallback = std::function<void(json const &)>;
 
   InitializeResult GetInitializeResult() const;
@@ -35,6 +38,12 @@ class McpServer {
       std::string const &uri);
   bool HasResource(std::string const &uri) const;
 
+  void RegisterPrompt(Prompt const &prompt, PromptGenerator generator);
+  std::vector<Prompt> ListPrompts() const;
+  async_simple::coro::Lazy<std::vector<PromptMessage>> GetPrompt(
+      std::string const &name, json const &arguments);
+  bool HasPrompt(std::string const &name) const;
+
   void SetSseCallback(SseEventCallback callback);
 
   private:
@@ -46,6 +55,10 @@ class McpServer {
   std::unordered_map<std::string, Resource> resources_;
   std::unordered_map<std::string, ResourceProvider> resource_providers_;
   mutable std::shared_mutex resource_mutex_;
+
+  std::unordered_map<std::string, Prompt> prompts_;
+  std::unordered_map<std::string, PromptGenerator> prompt_generators_;
+  mutable std::shared_mutex prompt_mutex_;
 
   SseEventCallback sse_callback_;
   mutable std::mutex sse_mutex_;
