@@ -14,9 +14,10 @@ McpServer::McpServer(std::string name, std::string version)
     : server_info_{.name = std::move(name), .version = std::move(version)} {}
 
 InitializeResult McpServer::GetInitializeResult() const {
-  return InitializeResult{.protocolVersion = std::string(LATEST_PROTOCOL_VERSION),
-                          .capabilities = json{{"tools", json::object()}},
-                          .serverInfo = server_info_};
+  return InitializeResult{
+      .protocolVersion = std::string(LATEST_PROTOCOL_VERSION),
+      .capabilities = json{{"tools", json::object()}},
+      .serverInfo = server_info_};
 }
 
 void McpServer::RegisterTool(Tool const &tool, ToolHandler handler) {
@@ -35,11 +36,10 @@ void McpServer::RegisterTool(Tool const &tool, ToolHandler handler) {
 
 std::vector<Tool> McpServer::ListTool() const {
   std::lock_guard lock(tools_mutex_);
-  std::vector<Tool> result;
-  for (auto const &[name, tool]: tools_) {
-    result.push_back(tool);
-  }
-  return result;
+  return tools_ | std::views::transform([](auto const &in) -> auto const & {
+           return in.second;
+         }) |
+         std::ranges::to<std::vector<Tool>>();
 }
 
 async_simple::coro::Lazy<ToolResult> McpServer::CallTool(
@@ -69,6 +69,45 @@ async_simple::coro::Lazy<ToolResult> McpServer::CallTool(
 bool McpServer::HasTool(std::string const &name) const {
   std::shared_lock lock(tools_mutex_);
   return tools_.contains(name);
+}
+
+void McpServer::RegisterResource(Resource const &resource,
+                                 ResourceProvider provider) {
+  std::lock_guard lock(resource_mutex_);
+  if (resources_.find(resource.uri) != resources_.end()) {
+    MCP_LOG_WARN("Resource '{}' already registered", resource.uri);
+  }
+  resources_[resource.uri] = resource;
+  resource_providers_[resource.uri] = std::move(provider);
+  MCP_LOG_INFO("Resource registered: {}", resource.uri);
+}
+
+std::vector<Resource> McpServer::ListResources() const {
+  std::lock_guard lock(resource_mutex_);
+  return resources_ | std::views::transform([](auto const &in) -> auto const & {
+           return in.second;
+         }) |
+         std::ranges::to<std::vector<Resource>>();
+}
+
+async_simple::coro::Lazy<ResourceContent> McpServer::ReadResource(
+    std::string const &uri) {
+  std::shared_lock lock(resource_mutex_);
+  auto provider_it = resource_providers_.find(uri);
+  if (provider_it == resource_providers_.end()) {
+    throw std::runtime_error(std::format("Resource not found {}", uri));
+  }
+  try {
+    co_return co_await provider_it->second(uri);
+  } catch (std::exception const &e) {
+    MCP_LOG_ERROR("Failed to read resource '{}' : {}", uri, e.what());
+    throw;
+  }
+}
+
+bool McpServer::HasResource(std::string const &uri) const {
+  std::shared_lock lock(resource_mutex_);
+  return resources_.contains(uri);
 }
 
 void McpServer::SetSseCallback(SseEventCallback callback) {

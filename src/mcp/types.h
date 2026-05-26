@@ -51,4 +51,18 @@ struct ToolResult {
   ToolResultType type;
 };
 
+struct Resource {
+  std::string uri;
+  std::string name;
+  std::optional<std::string> description;
+  std::optional<std::string> mimeType;
+};
+
+struct ResourceContent {
+  std::string uri;
+  std::optional<std::string> mimeType;
+  std::string text;
+  std::optional<std::string> blob;
+};
+
 }  // namespace mcp
