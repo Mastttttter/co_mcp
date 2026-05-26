@@ -15,8 +15,29 @@ struct ServerInfo {
   std::string version;
 };
 
+struct ServerCapabilities {
+  struct ToolsCapability {
+    bool list_changed = false;
+  };
+
+  struct ResourcesCapability {
+    bool subscribe = false;
+    bool list_changed = false;
+  };
+
+  struct PromptsCapability {
+    bool list_changed = false;
+  };
+
+  std::optional<ToolsCapability> tools;
+  std::optional<ResourcesCapability> resources;
+  std::optional<PromptsCapability> prompts;
+  std::optional<json> logging;
+};
+
 struct InitializeResult {
   std::string protocolVersion = std::string(LATEST_PROTOCOL_VERSION);
+  ServerCapabilities capabilities;
   ServerInfo serverInfo;
 };
 

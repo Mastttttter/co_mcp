@@ -12,12 +12,23 @@ namespace mcp {
 McpServer::McpServer() : McpServer("co_mcp", "1.0.0") {}
 
 McpServer::McpServer(std::string name, std::string version)
-    : server_info_{.name = std::move(name), .version = std::move(version)} {}
+    : server_info_{.name = std::move(name), .version = std::move(version)} {
+  capabilities_.tools = ServerCapabilities::ToolsCapability{false};
+  capabilities_.resources =
+      ServerCapabilities::ResourcesCapability{false, false};
+  capabilities_.prompts = ServerCapabilities::PromptsCapability{false};
+}
 
 InitializeResult McpServer::GetInitializeResult() const {
-  return InitializeResult{
-      .protocolVersion = std::string(LATEST_PROTOCOL_VERSION),
-      .serverInfo = server_info_};
+  InitializeResult result;
+  result.protocolVersion = LATEST_PROTOCOL_VERSION;
+  result.capabilities = capabilities_;
+  result.serverInfo = server_info_;
+  return result;
+}
+
+void McpServer::SetCapabilities(ServerCapabilities const &capabilities) {
+  capabilities_ = capabilities;
 }
 
 void McpServer::RegisterTool(Tool const &tool, ToolHandler handler) {

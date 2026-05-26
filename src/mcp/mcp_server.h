@@ -25,6 +25,8 @@ class McpServer {
           json const &arguments)>;
   using SseEventCallback = std::function<void(json const &)>;
 
+  void SetCapabilities(ServerCapabilities const &capabilities);
+
   InitializeResult GetInitializeResult() const;
   void RegisterTool(Tool const &tool, ToolHandler handler);
   std::vector<Tool> ListTool() const;
@@ -48,6 +50,7 @@ class McpServer {
 
   private:
   ServerInfo server_info_;
+  ServerCapabilities capabilities_;
   std::unordered_map<std::string, Tool> tools_;
   std::unordered_map<std::string, ToolHandler> tool_handlers_;
   mutable std::shared_mutex tools_mutex_;
