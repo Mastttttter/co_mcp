@@ -64,11 +64,38 @@ async_simple::coro::Lazy<ToolResult> McpServer::CallTool(
         .type = ToolResultType::error};
     co_return error;
   }
+  {
+    std::lock_guard<std::mutex> sse_lock(sse_mutex_);
+    if (sse_callback_) {
+      sse_callback_(json({{"type", "tool_call_start"},
+                          {"tool", name},
+                          {"arguments", arguments},
+                          {"timestamp", std::time(nullptr)}}));
+    }
+  }
   try {
     auto result = co_await handler_it->second(arguments);
     MCP_LOG_DEBUG("Tool {} executed successfully", name);
+    {
+      std::lock_guard<std::mutex> sse_lock(sse_mutex_);
+      if (sse_callback_) {
+        sse_callback_(json({{"type", "tool_call_end"},
+                            {"tool", name},
+                            {"success", result.type},
+                            {"timestamp", std::time(nullptr)}}));
+      }
+    }
     co_return result;
   } catch (std::exception const &e) {
+    {
+      std::lock_guard<std::mutex> sse_lock(sse_mutex_);
+      if (sse_callback_) {
+        sse_callback_(json({{"type", "tool_call_error"},
+                            {"tool", name},
+                            {"error", e.what()},
+                            {"timestamp", std::time(nullptr)}}));
+      }
+    }
     ToolResult error{
         .content{{.type = "text",
                   .text = std::format("executing tool error: {}", name)}},

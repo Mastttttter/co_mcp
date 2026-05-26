@@ -1,4 +1,6 @@
 #include "http_jsonrpc.h"
+#include <optional>
+#include <utility>
 #include "async_simple/coro/Lazy.h"
 #include "cinatra.hpp"
 #include "cinatra/coro_http_request.hpp"
@@ -7,8 +9,6 @@
 #include "config.h"
 #include "json_helper.hpp"
 #include "logger.h"
-#include <optional>
-#include <utility>
 
 namespace mcp {
 
@@ -129,9 +129,9 @@ void HttpJsonRpcServer::Init() {
       "/jsonrpc",
       [this](coro_http_request &req,
              coro_http_response &resp) -> async_simple::coro::Lazy<void> {
-        resp.add_header("Access-Control-Allow_Origin", "*");
-        resp.add_header("Access-Control-Methods", "POST, OPTIONS");
-        resp.add_header("Access-Control-Headers", "Content-Type");
+        resp.add_header("Access-Control-Allow-Origin", "*");
+        resp.add_header("Access-Control-Allow-Methods", "POST, OPTIONS");
+        resp.add_header("Access-Control-Allow-Headers", "Content-Type");
         resp.add_header("Content-Type", "application/json");
         try {
           std::string response =
@@ -150,9 +150,9 @@ void HttpJsonRpcServer::Init() {
       });
   impl_->server.set_http_handler<OPTIONS>(
       "/jsonrpc", [](coro_http_request &req, coro_http_response &resp) {
-        resp.add_header("Access-Control-Allow_Origin", "*");
-        resp.add_header("Access-Control-Methods", "POST, OPTIONS");
-        resp.add_header("Access-Control-Headers", "Content-Type");
+        resp.add_header("Access-Control-Allow-Origin", "*");
+        resp.add_header("Access-Control-Allow-Methods", "POST, OPTIONS");
+        resp.add_header("Access-Control-Allow-Headers", "Content-Type");
         resp.set_status(status_type::no_content);
       });
   impl_->server.set_http_handler<GET>(
@@ -160,8 +160,8 @@ void HttpJsonRpcServer::Init() {
         nlohmann::json health = {{"status", "ok"},
                                  {"service", "mcp-http-jsonrpc"},
                                  {"timestamp", std::time(nullptr)}};
-        resp.add_header("Access-Control-Headers", "Content-Type");
-        resp.set_status_and_content(status_type::no_content, health.dump());
+        resp.add_header("Access-Control-Allow-Headers", "Content-Type");
+        resp.set_status_and_content(status_type::ok, health.dump());
       });
   impl_->server.set_http_handler<GET>(
       "/", [](coro_http_request &req, coro_http_response &resp) {
@@ -176,8 +176,8 @@ void HttpJsonRpcServer::Init() {
                  {{"path", "/sse/tool_calls"}, {"method", "GET"}},
                  {{"path", "/"}, {"method", "GET"}},
              }}};
-        resp.add_header("Access-Control-Headers", "Content-Type");
-        resp.set_status_and_content(status_type::no_content, info.dump());
+        resp.add_header("Access-Control-Allow-Headers", "Content-Type");
+        resp.set_status_and_content(status_type::ok, info.dump());
       });
 }
 
@@ -188,7 +188,7 @@ void HttpJsonRpcServer::RegisterSseEndpoint(std::string const &path,
       path,
       [callback](coro_http_request &req,
                  coro_http_response &resp) -> async_simple::coro::Lazy<void> {
-        resp.add_header("Access-Control-Allow_Origin", "*");
+        resp.add_header("Access-Control-Allow-Origin", "*");
         resp.add_header("X-Accel-Buffering", "no");
         auto *conn = resp.get_conn();
         bool ok = co_await conn->begin_sse();
@@ -220,9 +220,8 @@ async_simple::coro::Lazy<std::string> HttpJsonRpcServer::HandleRequest(
     std::string const &request_body) {
   MCP_LOG_DEBUG("Request body: {}", request_body);
 
-  auto handle_single_request =
-      [this](JsonRpcRequest const &request)
-          -> async_simple::coro::Lazy<std::optional<JsonRpcResponse>> {
+  auto handle_single_request = [this](JsonRpcRequest const &request)
+      -> async_simple::coro::Lazy<std::optional<JsonRpcResponse>> {
     bool const has_id = request.id.has_value();
     json id = has_id ? request.id.value() : json(nullptr);
 
@@ -232,8 +231,9 @@ async_simple::coro::Lazy<std::string> HttpJsonRpcServer::HandleRequest(
       }
       JsonRpcResponse response;
       response.id = std::move(id);
-      response.error = JsonRpcError{.code = jsonrpc_errc::MethodNotFound,
-                                    .message = "Method not found: " + request.method};
+      response.error =
+          JsonRpcError{.code = jsonrpc_errc::MethodNotFound,
+                       .message = "Method not found: " + request.method};
       co_return std::optional<JsonRpcResponse>{std::move(response)};
     }
 
@@ -269,12 +269,13 @@ async_simple::coro::Lazy<std::string> HttpJsonRpcServer::HandleRequest(
           auto request = parse_jsonrpc_request(single_request_json);
           auto response = co_await handle_single_request(request);
           if (response.has_value()) {
-            batch_response.push_back(json_helper::reflect_to_json(response.value()));
+            batch_response.push_back(
+                json_helper::reflect_to_json(response.value()));
           }
         } catch (std::exception const &e) {
           MCP_LOG_WARN("Error in batch request: {}", e.what());
-          batch_response.push_back(jsonrpc_error_object(jsonrpc_errc::InvalidRequest,
-                                                       "Invalid request"));
+          batch_response.push_back(jsonrpc_error_object(
+              jsonrpc_errc::InvalidRequest, "Invalid request"));
         }
       }
       if (batch_response.empty()) {
