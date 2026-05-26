@@ -1,6 +1,5 @@
 #include <atomic>
 #include <chrono>
-#include <condition_variable>
 #include <csignal>
 #include <ctime>
 #include <exception>
@@ -17,6 +16,7 @@
 #include <vector>
 #include "async_simple/coro/Lazy.h"
 #include "async_simple/coro/SyncAwait.h"
+#include "cinatra/ylt/coro_io/coro_io.hpp"
 #include "config.h"
 #include "json_helper.hpp"
 #include "json_rpc/http_jsonrpc.h"
@@ -46,13 +46,10 @@ class EventQueue {
   void Push(mcp::json event) {
     std::lock_guard lock(mutex_);
     events_.push_back(std::move(event));
-    cv_.notify_all();
   }
 
-  std::vector<mcp::json> WaitAndDrain(std::chrono::milliseconds timeout) {
-    std::unique_lock lock(mutex_);
-    cv_.wait_for(lock, timeout,
-                 [this] { return !events_.empty() || !g_running.load(); });
+  std::vector<mcp::json> Drain() {
+    std::lock_guard lock(mutex_);
     std::vector<mcp::json> result;
     result.swap(events_);
     return result;
@@ -60,7 +57,6 @@ class EventQueue {
 
   private:
   std::mutex mutex_;
-  std::condition_variable cv_;
   std::vector<mcp::json> events_;
 };
 
@@ -103,6 +99,24 @@ bool IsSafeRelativePath(std::filesystem::path const &path) {
     }
   }
   return true;
+}
+
+mcp::ToolResult WriteFileBlocking(std::filesystem::path relative_path,
+                                  std::string content) {
+  try {
+    auto output_root = std::filesystem::absolute("mcp_demo_output");
+    auto target = (output_root / relative_path).lexically_normal();
+    std::filesystem::create_directories(target.parent_path());
+
+    std::ofstream file(target, std::ios::binary);
+    if (!file.is_open()) {
+      return ErrorResult("Failed to open output file");
+    }
+    file << content;
+    return TextResult("Successfully wrote to file: " + target.string());
+  } catch (std::exception const &e) {
+    return ErrorResult(std::format("Error writing file: {}", e.what()));
+  }
 }
 
 CliOptions ParseOptions(int argc, char *argv[]) {
@@ -286,22 +300,14 @@ void RegisterDemoTools(mcp::McpServer &server) {
               "Path must be relative and stay under mcp_demo_output");
         }
 
-        try {
-          auto output_root = std::filesystem::absolute("mcp_demo_output");
-          auto target = (output_root / relative_path).lexically_normal();
-          std::filesystem::create_directories(target.parent_path());
-
-          std::ofstream file(target, std::ios::binary);
-          if (!file.is_open()) {
-            co_return ErrorResult("Failed to open output file");
-          }
-          file << args["content"].get<std::string>();
-          co_return TextResult("Successfully wrote to file: " +
-                               target.string());
-        } catch (std::exception const &e) {
-          co_return ErrorResult(
-              std::format("Error writing file: {}", e.what()));
-        }
+        auto content = args["content"].get<std::string>();
+        auto result = co_await coro_io::post(
+            [relative_path = std::move(relative_path),
+             content = std::move(content)]() mutable {
+              return WriteFileBlocking(std::move(relative_path),
+                                       std::move(content));
+            });
+        co_return std::move(result).value();
       });
 }
 
@@ -489,7 +495,7 @@ void RegisterSseEndpoints(mcp::HttpJsonRpcServer &server,
               {"prompts_count", mcp_server.ListPrompts().size()},
               {"uptime_seconds",
                now - started_at}}.dump());
-          std::this_thread::sleep_for(5s);
+          co_await coro_io::sleep_for(5s);
         }
       });
 
@@ -500,9 +506,10 @@ void RegisterSseEndpoints(mcp::HttpJsonRpcServer &server,
             mcp::json{{"type", "connected"}, {"message", "Tool call stream"}}
                 .dump());
         while (g_running.load()) {
-          for (auto const &event: events.WaitAndDrain(1s)) {
+          for (auto const &event: events.Drain()) {
             co_await send_event(event.dump());
           }
+          co_await coro_io::sleep_for(250ms);
         }
       });
 }

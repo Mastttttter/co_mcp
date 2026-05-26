@@ -49,6 +49,8 @@ class McpServer {
   void SetSseCallback(SseEventCallback callback);
 
   private:
+  void EmitSseEvent(json const &event) const;
+
   ServerInfo server_info_;
   ServerCapabilities capabilities_;
   std::unordered_map<std::string, Tool> tools_;

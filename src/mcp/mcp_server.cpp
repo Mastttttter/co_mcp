@@ -32,17 +32,16 @@ void McpServer::SetCapabilities(ServerCapabilities const &capabilities) {
 }
 
 void McpServer::RegisterTool(Tool const &tool, ToolHandler handler) {
-  std::lock_guard lock(tools_mutex_);
-  if (tools_.contains(tool.name)) {
-    MCP_LOG_WARN("Tool '{}' already registered , overriding", tool.name);
+  {
+    std::lock_guard lock(tools_mutex_);
+    if (tools_.contains(tool.name)) {
+      MCP_LOG_WARN("Tool '{}' already registered , overriding", tool.name);
+    }
+    tools_[tool.name] = tool;
+    tool_handlers_[tool.name] = std::move(handler);
   }
-  tools_[tool.name] = tool;
-  tool_handlers_[tool.name] = std::move(handler);
   MCP_LOG_INFO("tool registered {},{}", tool.name, tool.description);
-  if (sse_callback_) {
-    json event{{"type", "tools_changed"}, {"timestamp", std::time(nullptr)}};
-    sse_callback_(event);
-  }
+  EmitSseEvent(json{{"type", "tools_changed"}, {"timestamp", std::time(nullptr)}});
 }
 
 std::vector<Tool> McpServer::ListTool() const {
@@ -55,47 +54,37 @@ std::vector<Tool> McpServer::ListTool() const {
 
 async_simple::coro::Lazy<ToolResult> McpServer::CallTool(
     std::string const &name, json const &arguments) {
-  std::shared_lock lock(tools_mutex_);
-  auto handler_it = tool_handlers_.find(name);
-  if (handler_it == tool_handlers_.end()) {
-    ToolResult error{
-        .content{
-            {.type = "text", .text = std::format("Tools not found: {}", name)}},
-        .type = ToolResultType::error};
-    co_return error;
-  }
+  ToolHandler handler;
   {
-    std::lock_guard<std::mutex> sse_lock(sse_mutex_);
-    if (sse_callback_) {
-      sse_callback_(json({{"type", "tool_call_start"},
-                          {"tool", name},
-                          {"arguments", arguments},
-                          {"timestamp", std::time(nullptr)}}));
+    std::shared_lock lock(tools_mutex_);
+    auto handler_it = tool_handlers_.find(name);
+    if (handler_it == tool_handlers_.end()) {
+      ToolResult error{
+          .content{{.type = "text",
+                    .text = std::format("Tools not found: {}", name)}},
+          .type = ToolResultType::error};
+      co_return error;
     }
+    handler = handler_it->second;
   }
+
+  EmitSseEvent(json{{"type", "tool_call_start"},
+                    {"tool", name},
+                    {"arguments", arguments},
+                    {"timestamp", std::time(nullptr)}});
   try {
-    auto result = co_await handler_it->second(arguments);
+    auto result = co_await handler(arguments);
     MCP_LOG_DEBUG("Tool {} executed successfully", name);
-    {
-      std::lock_guard<std::mutex> sse_lock(sse_mutex_);
-      if (sse_callback_) {
-        sse_callback_(json({{"type", "tool_call_end"},
-                            {"tool", name},
-                            {"success", result.type},
-                            {"timestamp", std::time(nullptr)}}));
-      }
-    }
+    EmitSseEvent(json{{"type", "tool_call_end"},
+                      {"tool", name},
+                      {"success", result.type},
+                      {"timestamp", std::time(nullptr)}});
     co_return result;
   } catch (std::exception const &e) {
-    {
-      std::lock_guard<std::mutex> sse_lock(sse_mutex_);
-      if (sse_callback_) {
-        sse_callback_(json({{"type", "tool_call_error"},
-                            {"tool", name},
-                            {"error", e.what()},
-                            {"timestamp", std::time(nullptr)}}));
-      }
-    }
+    EmitSseEvent(json{{"type", "tool_call_error"},
+                      {"tool", name},
+                      {"error", e.what()},
+                      {"timestamp", std::time(nullptr)}});
     ToolResult error{
         .content{{.type = "text",
                   .text = std::format("executing tool error: {}", name)}},
@@ -130,13 +119,17 @@ std::vector<Resource> McpServer::ListResources() const {
 
 async_simple::coro::Lazy<ResourceContent> McpServer::ReadResource(
     std::string const &uri) {
-  std::shared_lock lock(resource_mutex_);
-  auto provider_it = resource_providers_.find(uri);
-  if (provider_it == resource_providers_.end()) {
-    throw std::runtime_error(std::format("Resource not found {}", uri));
+  ResourceProvider provider;
+  {
+    std::shared_lock lock(resource_mutex_);
+    auto provider_it = resource_providers_.find(uri);
+    if (provider_it == resource_providers_.end()) {
+      throw std::runtime_error(std::format("Resource not found {}", uri));
+    }
+    provider = provider_it->second;
   }
   try {
-    co_return co_await provider_it->second(uri);
+    co_return co_await provider(uri);
   } catch (std::exception const &e) {
     MCP_LOG_ERROR("Failed to read resource '{}' : {}", uri, e.what());
     throw;
@@ -166,13 +159,17 @@ std::vector<Prompt> McpServer::ListPrompts() const {
 
 async_simple::coro::Lazy<std::vector<PromptMessage>> McpServer::GetPrompt(
     std::string const &name, json const &arguments) {
-  std::shared_lock lock(prompt_mutex_);
-  auto gen_it = prompt_generators_.find(name);
-  if (gen_it == prompt_generators_.end()) {
-    throw std::runtime_error(std::format("Prompt not found: {}", name));
+  PromptGenerator generator;
+  {
+    std::shared_lock lock(prompt_mutex_);
+    auto gen_it = prompt_generators_.find(name);
+    if (gen_it == prompt_generators_.end()) {
+      throw std::runtime_error(std::format("Prompt not found: {}", name));
+    }
+    generator = gen_it->second;
   }
   try {
-    co_return co_await gen_it->second(arguments);
+    co_return co_await generator(arguments);
   } catch (std::exception const &e) {
     auto s = std::format("failed to generate prompt '{}':{}", name, e.what());
     MCP_LOG_ERROR("{}", s);
@@ -186,6 +183,18 @@ bool McpServer::HasPrompt(std::string const &name) const {
 }
 
 void McpServer::SetSseCallback(SseEventCallback callback) {
-  sse_callback_ = callback;
+  std::lock_guard lock(sse_mutex_);
+  sse_callback_ = std::move(callback);
+}
+
+void McpServer::EmitSseEvent(json const &event) const {
+  SseEventCallback callback;
+  {
+    std::lock_guard lock(sse_mutex_);
+    callback = sse_callback_;
+  }
+  if (callback) {
+    callback(event);
+  }
 }
 }  // namespace mcp

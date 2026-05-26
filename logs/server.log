@@ -1,0 +1,10 @@
+[2026-05-26 22:39:13.360] [info] [mcp_server] [211396] [/home/master/dev/code/cpps/co_mcp/src/mcp/mcp_server.cpp:43]tool registered echo,Echo back the input message
+[2026-05-26 22:39:13.360] [info] [mcp_server] [211396] [/home/master/dev/code/cpps/co_mcp/src/mcp/mcp_server.cpp:43]tool registered calculate,Perform basic arithmetic operations
+[2026-05-26 22:39:13.360] [info] [mcp_server] [211396] [/home/master/dev/code/cpps/co_mcp/src/mcp/mcp_server.cpp:43]tool registered get_time,Get current system time
+[2026-05-26 22:39:13.360] [info] [mcp_server] [211396] [/home/master/dev/code/cpps/co_mcp/src/mcp/mcp_server.cpp:43]tool registered get_weather,Get weather information for a city
+[2026-05-26 22:39:13.360] [info] [mcp_server] [211396] [/home/master/dev/code/cpps/co_mcp/src/mcp/mcp_server.cpp:43]tool registered write_file,Write content to a relative file under mcp_demo_output
+[2026-05-26 22:39:13.360] [info] [mcp_server] [211396] [/home/master/dev/code/cpps/co_mcp/src/mcp/mcp_server.cpp:109]Resource registered: system://info
+[2026-05-26 22:39:13.360] [info] [mcp_server] [211396] [/home/master/dev/code/cpps/co_mcp/src/mcp/mcp_server.cpp:109]Resource registered: config://server
+[2026-05-26 22:39:13.360] [info] [mcp_server] [211396] [/home/master/dev/code/cpps/co_mcp/src/mcp/mcp_server.cpp:149]Prompt registered: code_review
+[2026-05-26 22:39:13.360] [info] [mcp_server] [211396] [/home/master/dev/code/cpps/co_mcp/src/mcp_demo_server_main.cpp:526]HTTP server started on 127.0.0.1:18080
+[2026-05-26 22:39:18.382] [info] [mcp_server] [211396] [/home/master/dev/code/cpps/co_mcp/src/mcp_demo_server_main.cpp:606]Server shutdown complete
